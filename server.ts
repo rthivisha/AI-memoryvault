@@ -1061,6 +1061,12 @@ app.get('/api/memories/search', requireAuth, (req: AuthRequest, res) => {
     const descTokens = tokenize(desc);
     const docTokens = [...titleTokens, ...descTokens];
 
+    const tags = db.prepare(`
+      SELECT t.id, t.name, t.color FROM tags t
+      JOIN memory_tags mt ON t.id = mt.tag_id
+      WHERE mt.memory_id = ?
+    `).all(r.id);
+
     let matchCount = 0;
     const why: string[] = [];
     for (const t of tokens) {
@@ -1070,6 +1076,12 @@ app.get('/api/memories/search', requireAuth, (req: AuthRequest, res) => {
       } else if (descTokens.includes(t)) {
         matchCount += 1.0;
         why.push(`Description contains '${t}'`);
+      } else if (r.category && r.category.toLowerCase().includes(t)) {
+        matchCount += 1.4;
+        why.push(`Category folder '${r.category}' matches '${t}'`);
+      } else if (tags.some((tag: any) => tag.name.toLowerCase().includes(t))) {
+        matchCount += 1.3;
+        why.push(`Tag folder matches '${t}'`);
       } else if (t.length >= 5 && docTokens.some(dt => levenshteinDistance(t, dt) <= 1)) {
         matchCount += 0.8;
         why.push(`Fuzzy match with '${t}'`);
@@ -1089,6 +1101,7 @@ app.get('/api/memories/search', requireAuth, (req: AuthRequest, res) => {
           keywords: JSON.parse(r.keywords || '[]'),
           mood: r.mood || 'neutral',
           isFavorite: Boolean(r.is_favorite),
+          tags,
         },
         score: Math.min(score, 1.0),
         bm25Score: Math.round(score * 1.5 * 100) / 100,

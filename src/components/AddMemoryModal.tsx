@@ -91,6 +91,7 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
   const photoInputRef = useRef<HTMLInputElement>(null);
   const audioFileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const micCaptureInputRef = useRef<HTMLInputElement>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -178,16 +179,37 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
     );
   };
 
-  // Voice recording controls
+  // Voice recording controls with cross-browser support & permission guidance
   const startRecording = async () => {
     try {
       setMicError(null);
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Audio recording is not supported in this browser.');
+        throw new Error('Direct microphone streaming is not supported by this browser. Use Device Mic Capture below.');
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      
+      // Determine cross-browser supported audio MIME type
+      let selectedMime = '';
+      if (typeof MediaRecorder !== 'undefined') {
+        const types = [
+          'audio/webm;codecs=opus',
+          'audio/webm',
+          'audio/mp4',
+          'audio/aac',
+          'audio/ogg;codecs=opus',
+          'audio/ogg',
+          'audio/wav',
+        ];
+        for (const t of types) {
+          if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) {
+            selectedMime = t;
+            break;
+          }
+        }
+      }
+
+      const mediaRecorder = selectedMime ? new MediaRecorder(stream, { mimeType: selectedMime }) : new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -198,8 +220,8 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
       };
 
       mediaRecorder.onstop = () => {
-        const mimeType = mediaRecorder.mimeType || 'audio/webm';
-        const ext = mimeType.includes('wav') ? '.wav' : mimeType.includes('ogg') ? '.ogg' : '.webm';
+        const mimeType = mediaRecorder.mimeType || selectedMime || 'audio/webm';
+        const ext = mimeType.includes('mp4') || mimeType.includes('aac') ? '.m4a' : mimeType.includes('wav') ? '.wav' : mimeType.includes('ogg') ? '.ogg' : '.webm';
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         const now = new Date();
         const timestamp = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
@@ -216,7 +238,12 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
         setRecordSeconds((s) => s + 1);
       }, 1000);
     } catch (err: any) {
-      const msg = err.message || 'Microphone access denied.';
+      let msg = err.message || 'Microphone access denied.';
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' || err.message?.includes('Permission denied')) {
+        msg = 'Microphone permission was blocked. In your browser URL bar, click the 🔒 Lock or 🎙️ Mic icon and select "Allow". Alternatively, click "Device Mic Capture" to record via your operating system!';
+      } else if (err.name === 'NotFoundError') {
+        msg = 'No audio input hardware (microphone) detected on your device.';
+      }
       setMicError(msg);
       onError(msg);
     }
@@ -628,6 +655,14 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
             capture="environment"
             className="hidden"
           />
+          <input
+            type="file"
+            ref={micCaptureInputRef}
+            onChange={(e) => handleFilesAdded(e.target.files)}
+            accept="audio/*"
+            capture="user"
+            className="hidden"
+          />
 
           {/* Dropzone & Multi-Action Bar */}
           <div
@@ -685,6 +720,17 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
                   </button>
                 </div>
               )}
+
+              {/* Device Voice App Native Recorder */}
+              <button
+                type="button"
+                onClick={() => micCaptureInputRef.current?.click()}
+                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-teal-300 text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
+                title="Opens your device/phone built-in voice recorder app (bypasses browser permission limits)"
+              >
+                <Volume2 className="w-4 h-4 text-teal-400" />
+                <span>Device Voice App</span>
+              </button>
 
               {/* Upload Pre-recorded Audio */}
               <button
