@@ -1,0 +1,6 @@
+{
+  "name": "AI MemoVault",
+  "description": "Secure personal digital memory management system with hand-crafted lexical AI retrieval, TF-IDF keyword extraction, lexicon classification, and inverted index search.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
