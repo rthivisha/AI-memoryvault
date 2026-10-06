@@ -23,6 +23,10 @@ import {
   Pause,
   Image as ImageIcon,
   Volume2,
+  Video,
+  Film,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 import { api } from '../api';
 import { CategoryType, Memory, MoodType, SuggestResponse } from '../types';
@@ -89,6 +93,8 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
   // Refs
   const generalFileInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const videoCaptureInputRef = useRef<HTMLInputElement>(null);
   const audioFileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const micCaptureInputRef = useRef<HTMLInputElement>(null);
@@ -98,6 +104,24 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
   const recordingTimerRef = useRef<any>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const activeAudioElRef = useRef<HTMLAudioElement | null>(null);
+  const activeStreamRef = useRef<MediaStream | null>(null);
+  const selectedFilesRef = useRef<File[]>([]);
+  selectedFilesRef.current = selectedFiles;
+  const [micGranted, setMicGranted] = useState<boolean>(false);
+
+  // Check microphone permission status on mount
+  useEffect(() => {
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'microphone' as PermissionName })
+        .then((permissionStatus) => {
+          if (permissionStatus.state === 'granted') setMicGranted(true);
+          permissionStatus.onchange = () => {
+            setMicGranted(permissionStatus.state === 'granted');
+          };
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   // Live lexical classification
   useEffect(() => {
@@ -123,8 +147,13 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
   useEffect(() => {
     return () => {
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      if (activeStreamRef.current) {
+        activeStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        mediaRecorderRef.current.stream.getTracks().forEach((t) => t.stop());
+        try {
+          mediaRecorderRef.current.stop();
+        } catch {}
       }
       if (activeAudioElRef.current) {
         activeAudioElRef.current.pause();
@@ -132,31 +161,60 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
     };
   }, []);
 
+  // Request & grant microphone permission proactively
+  const requestMicPermission = async () => {
+    try {
+      setMicError(null);
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Microphone streaming not supported. Use Device Voice App instead.');
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setMicGranted(true);
+      // Immediately stop track after grant check to free hardware
+      stream.getTracks().forEach((t) => t.stop());
+    } catch (err: any) {
+      let msg = err.message || 'Microphone access denied.';
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' || err.message?.includes('Permission denied')) {
+        msg = 'Microphone permission blocked. Click the 🔒 Lock or 🎙️ Mic icon in your browser URL bar and select "Allow". You can also use "Device Voice App" below!';
+      }
+      setMicError(msg);
+      onError(msg);
+    }
+  };
+
   const handleFilesAdded = (incoming: FileList | File[] | null) => {
     if (!incoming) return;
     const filesArray = Array.from(incoming);
     if (filesArray.length === 0) return;
 
-    // Check sizes
+    // Check sizes (up to 100MB per video, photo, or audio)
     const valid = filesArray.filter((f) => {
-      if (f.size > 15 * 1024 * 1024) {
-        onError(`File '${f.name}' exceeds the 15MB limit and was skipped.`);
+      if (f.size > 100 * 1024 * 1024) {
+        onError(`File '${f.name}' exceeds the 100MB limit and was skipped.`);
         return false;
       }
       return true;
     });
 
-    const combined = [...selectedFiles, ...valid].slice(0, 10);
+    const currentList = selectedFilesRef.current;
+    const combined = [...currentList, ...valid].slice(0, 15);
+    selectedFilesRef.current = combined;
     setSelectedFiles(combined);
 
-    const previews = combined.map((f) => ({
-      name: f.name,
-      size: f.size,
-      type: f.type,
-      url: f.type.startsWith('image/') || f.type.startsWith('audio/')
-        ? URL.createObjectURL(f)
-        : undefined,
-    }));
+    const previews = combined.map((f) => {
+      const isMedia =
+        f.type.startsWith('image/') ||
+        f.type.startsWith('audio/') ||
+        f.type.startsWith('video/') ||
+        /\.(jpe?g|png|gif|webp|svg|mp3|wav|m4a|aac|ogg|webm|mp4|mov|mkv|avi)$/i.test(f.name);
+
+      return {
+        name: f.name,
+        size: f.size,
+        type: f.type,
+        url: isMedia ? URL.createObjectURL(f) : undefined,
+      };
+    });
     setFilePreviews(previews);
   };
 
@@ -165,17 +223,25 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
       activeAudioElRef.current.pause();
       setPlayingAudioIdx(null);
     }
-    const updated = selectedFiles.filter((_, i) => i !== index);
+    const currentList = selectedFilesRef.current;
+    const updated = currentList.filter((_, i) => i !== index);
+    selectedFilesRef.current = updated;
     setSelectedFiles(updated);
     setFilePreviews(
-      updated.map((f) => ({
-        name: f.name,
-        size: f.size,
-        type: f.type,
-        url: f.type.startsWith('image/') || f.type.startsWith('audio/')
-          ? URL.createObjectURL(f)
-          : undefined,
-      }))
+      updated.map((f) => {
+        const isMedia =
+          f.type.startsWith('image/') ||
+          f.type.startsWith('audio/') ||
+          f.type.startsWith('video/') ||
+          /\.(jpe?g|png|gif|webp|svg|mp3|wav|m4a|aac|ogg|webm|mp4|mov|mkv|avi)$/i.test(f.name);
+
+        return {
+          name: f.name,
+          size: f.size,
+          type: f.type,
+          url: isMedia ? URL.createObjectURL(f) : undefined,
+        };
+      })
     );
   };
 
@@ -184,11 +250,21 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
     try {
       setMicError(null);
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Direct microphone streaming is not supported by this browser. Use Device Mic Capture below.');
+        throw new Error('Direct microphone streaming is not supported by this browser. Use Device Voice App below.');
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
+      // Ensure any previous stream tracks are stopped before starting a second recording
+      if (activeStreamRef.current) {
+        activeStreamRef.current.getTracks().forEach((t) => t.stop());
+        activeStreamRef.current = null;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true },
+      });
+      activeStreamRef.current = stream;
+      setMicGranted(true);
+
       // Determine cross-browser supported audio MIME type
       let selectedMime = '';
       if (typeof MediaRecorder !== 'undefined') {
@@ -209,29 +285,42 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
         }
       }
 
-      const mediaRecorder = selectedMime ? new MediaRecorder(stream, { mimeType: selectedMime }) : new MediaRecorder(stream);
+      let mediaRecorder: MediaRecorder;
+      try {
+        mediaRecorder = selectedMime ? new MediaRecorder(stream, { mimeType: selectedMime }) : new MediaRecorder(stream);
+      } catch {
+        mediaRecorder = new MediaRecorder(stream);
+      }
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
       mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
+        if (e.data && e.data.size > 0) {
           audioChunksRef.current.push(e.data);
         }
       };
 
       mediaRecorder.onstop = () => {
+        // Stop stream tracks immediately so hardware is freed for subsequent recordings
+        stream.getTracks().forEach((track) => track.stop());
+        activeStreamRef.current = null;
+
         const mimeType = mediaRecorder.mimeType || selectedMime || 'audio/webm';
         const ext = mimeType.includes('mp4') || mimeType.includes('aac') ? '.m4a' : mimeType.includes('wav') ? '.wav' : mimeType.includes('ogg') ? '.ogg' : '.webm';
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        const now = new Date();
-        const timestamp = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
-        const voiceFile = new File([audioBlob], `Voice_Recording_${timestamp}${ext}`, { type: mimeType });
+        if (audioBlob.size > 0) {
+          const now = new Date();
+          const timestamp = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
+          const voiceFile = new File([audioBlob], `Voice_Recording_${timestamp}${ext}`, { type: mimeType });
+          handleFilesAdded([voiceFile]);
 
-        handleFilesAdded([voiceFile]);
-        stream.getTracks().forEach((track) => track.stop());
+          // Auto-fill title and description so saving audio never hits validation hurdles
+          setTitle((prev) => prev.trim() ? prev : `Voice Note - ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`);
+          setDescription((prev) => prev.trim() ? prev : `Voice recording memo captured on ${now.toLocaleDateString()} at ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`);
+        }
       };
 
-      mediaRecorder.start(200);
+      mediaRecorder.start(250);
       setIsRecording(true);
       setRecordSeconds(0);
       recordingTimerRef.current = setInterval(() => {
@@ -240,7 +329,7 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
     } catch (err: any) {
       let msg = err.message || 'Microphone access denied.';
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' || err.message?.includes('Permission denied')) {
-        msg = 'Microphone permission was blocked. In your browser URL bar, click the 🔒 Lock or 🎙️ Mic icon and select "Allow". Alternatively, click "Device Mic Capture" to record via your operating system!';
+        msg = 'Microphone permission was blocked. In your browser URL bar, click the 🔒 Lock or 🎙️ Mic icon and select "Allow". Alternatively, click "Device Voice App" to record via your operating system!';
       } else if (err.name === 'NotFoundError') {
         msg = 'No audio input hardware (microphone) detected on your device.';
       }
@@ -251,7 +340,12 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
+      try {
+        mediaRecorderRef.current.requestData();
+      } catch {}
+      try {
+        mediaRecorderRef.current.stop();
+      } catch {}
     }
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
@@ -261,10 +355,15 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
   };
 
   const cancelRecording = () => {
+    if (activeStreamRef.current) {
+      activeStreamRef.current.getTracks().forEach((track) => track.stop());
+      activeStreamRef.current = null;
+    }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
       mediaRecorderRef.current.onstop = null; // discard onstop handler
-      mediaRecorderRef.current.stop();
+      try {
+        mediaRecorderRef.current.stop();
+      } catch {}
     }
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
@@ -348,17 +447,48 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!title.trim() || title.trim().length > 60) {
-      onError('Title cannot be empty and must be 60 characters or fewer.');
-      return;
+    let finalTitle = title.trim();
+    if (!finalTitle) {
+      if (selectedFiles.some((f) => f.type.startsWith('audio/') || f.name.toLowerCase().includes('voice'))) {
+        finalTitle = `Voice Note - ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+      } else if (selectedFiles.length > 0) {
+        finalTitle = `Media Memory - ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+      } else {
+        onError('Title cannot be empty. Please enter a memory title.');
+        return;
+      }
     }
-    if (description.trim().length < 5 || description.trim().length > 500) {
-      onError('Description must be between 5 and 500 characters.');
-      return;
+    if (finalTitle.length > 60) {
+      finalTitle = finalTitle.substring(0, 60);
     }
+
     if (date > todayStr) {
       onError('A memory cannot be dated in the future.');
       return;
+    }
+
+    // Auto-resolve description: NEVER throw an error if description is short or blank when audio or photos exist
+    let finalDesc = description.trim();
+    if (finalDesc.length < 5) {
+      const hasAudio = selectedFiles.some((f) =>
+        f.type.startsWith('audio/') ||
+        f.name.toLowerCase().includes('voice') ||
+        /\.(mp3|wav|m4a|aac|ogg|webm)$/i.test(f.name)
+      );
+      if (hasAudio) {
+        finalDesc = finalDesc
+          ? `${finalDesc} - Voice recording for ${finalTitle}`
+          : `Recorded audio reflection for "${finalTitle}". Encrypted and stored in audio gallery vault.`;
+      } else if (selectedFiles.length > 0) {
+        finalDesc = finalDesc
+          ? `${finalDesc} - Media attachment for ${finalTitle}`
+          : `Media memory record with ${selectedFiles.length} file attachment(s) for "${finalTitle}".`;
+      } else {
+        finalDesc = finalDesc ? `${finalDesc} (${finalTitle})` : `${finalTitle} - Encrypted personal memory record.`;
+      }
+    }
+    if (finalDesc.length > 1000) {
+      finalDesc = finalDesc.substring(0, 1000);
     }
 
     setSaving(true);
@@ -375,9 +505,9 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
         .filter(Boolean);
 
       const created = await api.createMemory({
-        title: title.trim(),
+        title: finalTitle,
         date,
-        description: description.trim(),
+        description: finalDesc,
         category: overrideCategory || undefined,
         mood,
         location_name: locationName.trim() || undefined,
@@ -385,19 +515,25 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
         people: peopleList,
       });
 
-      // Upload attachments if any (multiple photos, audio notes, docs)
+      // Upload attachments if any (multiple photos, audio notes, docs, videos)
       if (selectedFiles.length > 0) {
-        setSavingStatus(`Uploading ${selectedFiles.length} attachment(s) (photos, voice notes)...`);
+        setSavingStatus(`Uploading & encrypting ${selectedFiles.length} media attachment(s)...`);
         try {
           await api.uploadAttachments(created.memoryId, selectedFiles);
         } catch (uploadErr: any) {
-          onError(`Memory saved, but attachments failed to upload: ${uploadErr.message || 'Error'}`);
+          onError(`Memory record saved, but attachments failed: ${uploadErr.message || 'Error'}`);
           onSuccess(created, `Memory saved with ID: ${created.memoryId} (attachments failed)`);
           return;
         }
       }
 
-      onSuccess(created, `Memory saved with ID: ${created.memoryId}`);
+      // Fetch the full updated memory record with all attachments populated
+      let finalMemory = created;
+      try {
+        finalMemory = await api.getMemory(created.memoryId);
+      } catch {}
+
+      onSuccess(finalMemory, `Memory saved to vault with ID: ${created.memoryId}`);
     } catch (err: any) {
       onError(err.message || 'Failed to save memory record.');
     } finally {
@@ -572,13 +708,15 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
             <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
               <FileText className="w-3.5 h-3.5 text-cyan-400" />
               <span>Detailed Narrative</span>
-              <span className="text-slate-500 font-normal">({description.length}/500 chars)</span>
+              <span className="text-slate-500 font-normal">
+                {selectedFiles.length > 0 ? '(Optional - Auto-filled from attachments)' : `(${description.length}/500 chars)`}
+              </span>
             </label>
             <button
               type="button"
               onClick={handleAutoSummary}
               disabled={generatingSummary || description.length < 30}
-              className="text-[11px] text-slate-400 hover:text-slate-200 transition-colors disabled:opacity-50"
+              className="text-[11px] text-slate-400 hover:text-slate-200 transition-colors disabled:opacity-50 cursor-pointer"
             >
               {generatingSummary ? 'Summarizing...' : 'Generate 1-sentence summary'}
             </button>
@@ -588,8 +726,7 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
             onChange={(e) => setDescription(e.target.value)}
             rows={4}
             maxLength={500}
-            placeholder="What happened? What were the key takeaways, challenges, or insights? Encrypted at rest using AES-256-GCM."
-            required
+            placeholder="What happened? What were the key takeaways or insights? (Optional if audio note or photos attached)"
             className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-colors"
           />
         </div>
@@ -609,17 +746,30 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
           />
         </div>
 
-        {/* Multi-Attachment Uploader: Multiple Photos & Voice Recordings */}
+        {/* Multi-Attachment Uploader: Photos, Videos & Voice Recordings */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
               <Paperclip className="w-3.5 h-3.5 text-cyan-400" />
               <span>Attachments & Media</span>
-              <span className="text-slate-500 font-normal">({selectedFiles.length}/10 max)</span>
+              <span className="text-slate-500 font-normal">({selectedFiles.length}/15 max • up to 100MB)</span>
             </label>
-            <span className="text-[11px] text-slate-400">
-              Multiple Photos • Voice Memos • Documents
-            </span>
+            <div className="flex items-center gap-2 text-[11px]">
+              {micGranted ? (
+                <span className="text-emerald-400 flex items-center gap-1 font-mono">
+                  <CheckCircle2 className="w-3 h-3" /> Mic Ready
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={requestMicPermission}
+                  className="text-cyan-400 hover:text-cyan-300 underline font-mono flex items-center gap-1"
+                >
+                  <Mic className="w-3 h-3" /> Enable Mic
+                </button>
+              )}
+              <span className="text-slate-400">Photos • Videos • Voice Memos</span>
+            </div>
           </div>
 
           {/* Hidden inputs for file types */}
@@ -628,7 +778,7 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
             ref={generalFileInputRef}
             onChange={(e) => handleFilesAdded(e.target.files)}
             multiple
-            accept="image/*,audio/*,application/pdf"
+            accept="image/*,video/*,audio/*,application/pdf"
             className="hidden"
           />
           <input
@@ -637,6 +787,22 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
             onChange={(e) => handleFilesAdded(e.target.files)}
             multiple
             accept="image/*"
+            className="hidden"
+          />
+          <input
+            type="file"
+            ref={videoInputRef}
+            onChange={(e) => handleFilesAdded(e.target.files)}
+            multiple
+            accept="video/*"
+            className="hidden"
+          />
+          <input
+            type="file"
+            ref={videoCaptureInputRef}
+            onChange={(e) => handleFilesAdded(e.target.files)}
+            accept="video/*"
+            capture="environment"
             className="hidden"
           />
           <input
@@ -676,15 +842,36 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
             }`}
           >
             {/* Action Buttons Row */}
-            <div className="flex flex-wrap items-center justify-center gap-2.5">
+            <div className="flex flex-wrap items-center justify-center gap-2">
               {/* Add Multiple Photos */}
               <button
                 type="button"
                 onClick={() => photoInputRef.current?.click()}
-                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow-sm hover:text-white"
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow-sm hover:text-white"
               >
                 <ImageIcon className="w-4 h-4 text-cyan-400" />
                 <span>Upload Photos</span>
+              </button>
+
+              {/* Add Videos */}
+              <button
+                type="button"
+                onClick={() => videoInputRef.current?.click()}
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-indigo-300 text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow-sm hover:text-white"
+              >
+                <Video className="w-4 h-4 text-indigo-400" />
+                <span>Upload Videos</span>
+              </button>
+
+              {/* Record Video / Camera */}
+              <button
+                type="button"
+                onClick={() => videoCaptureInputRef.current?.click()}
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-purple-300 text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow-sm hover:text-white"
+                title="Record video with device camera"
+              >
+                <Film className="w-4 h-4 text-purple-400" />
+                <span>Record Video</span>
               </button>
 
               {/* Direct In-Browser Voice Recording */}
@@ -725,7 +912,7 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
               <button
                 type="button"
                 onClick={() => micCaptureInputRef.current?.click()}
-                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-teal-300 text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-teal-300 text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
                 title="Opens your device/phone built-in voice recorder app (bypasses browser permission limits)"
               >
                 <Volume2 className="w-4 h-4 text-teal-400" />
@@ -736,20 +923,20 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
               <button
                 type="button"
                 onClick={() => audioFileInputRef.current?.click()}
-                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
               >
                 <Music className="w-4 h-4 text-amber-400" />
                 <span>Audio File</span>
               </button>
 
-              {/* Mobile Camera */}
+              {/* Camera Photo */}
               <button
                 type="button"
                 onClick={() => cameraInputRef.current?.click()}
                 className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
               >
-                <Camera className="w-4 h-4 text-purple-400" />
-                <span>Camera</span>
+                <Camera className="w-4 h-4 text-pink-400" />
+                <span>Camera Photo</span>
               </button>
 
               {/* General File Browser */}
@@ -764,13 +951,21 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
             </div>
 
             <p className="text-[11px] text-slate-400 mt-3">
-              Drag and drop multiple photos, recorded voice notes, or documents here. Max 10 files (15MB each).
+              Drag and drop photos, videos, recorded voice notes, or documents here. Max 15 files (up to 100MB each).
             </p>
 
             {micError && (
-              <p className="text-[11px] text-rose-400 mt-2 font-mono">
-                {micError}
-              </p>
+              <div className="mt-2.5 p-2 rounded bg-rose-950/60 border border-rose-800/60 text-[11px] text-rose-300 flex items-center justify-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>{micError}</span>
+                <button
+                  type="button"
+                  onClick={requestMicPermission}
+                  className="px-2 py-0.5 rounded bg-rose-800 hover:bg-rose-700 text-white font-mono text-[10px]"
+                >
+                  Retry Permission
+                </button>
+              </div>
             )}
           </div>
 
@@ -779,7 +974,8 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
             <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3 mt-3">
               {filePreviews.map((f, idx) => {
                 const isImg = f.type.startsWith('image/');
-                const isAudio = f.type.startsWith('audio/') || f.name.endsWith('.webm') || f.name.endsWith('.wav') || f.name.endsWith('.mp3');
+                const isVid = f.type.startsWith('video/') || f.name.endsWith('.mp4') || f.name.endsWith('.mov') || f.name.endsWith('.webm');
+                const isAudio = f.type.startsWith('audio/') || f.name.endsWith('.wav') || f.name.endsWith('.mp3') || f.name.endsWith('.m4a') || f.name.endsWith('.ogg');
 
                 return (
                   <div
@@ -802,6 +998,18 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
                           alt={f.name}
                           className="w-full h-full object-cover"
                         />
+                      </div>
+                    ) : isVid && f.url ? (
+                      <div className="w-full h-20 rounded overflow-hidden bg-slate-900 mb-1.5 relative group/vid">
+                        <video
+                          src={f.url}
+                          className="w-full h-full object-cover"
+                          muted
+                          playsInline
+                        />
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                          <Video className="w-5 h-5 text-indigo-400" />
+                        </div>
                       </div>
                     ) : isAudio ? (
                       <div className="w-full h-20 flex flex-col items-center justify-center bg-teal-950/40 border border-teal-800/40 rounded mb-1.5 text-teal-400 p-2">
@@ -834,7 +1042,7 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
                       {f.name}
                     </span>
                     <span className="text-[9px] text-slate-500 tabular-nums">
-                      {(f.size / 1024).toFixed(0)} KB
+                      {(f.size / (1024 * 1024)).toFixed(1)} MB
                     </span>
                   </div>
                 );

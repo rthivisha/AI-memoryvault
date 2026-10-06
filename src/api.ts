@@ -194,10 +194,11 @@ export const api = {
   },
 
   // Gallery
-  listGallery: (params?: { category?: string; year?: string }) => {
+  listGallery: (params?: { category?: string; year?: string; type?: string }) => {
     const query = new URLSearchParams();
     if (params?.category) query.set('category', params.category);
     if (params?.year) query.set('year', params.year);
+    if (params?.type) query.set('type', params.type);
     const qs = query.toString() ? `?${query.toString()}` : '';
     return request<GalleryItem[]>(`/api/gallery${qs}`);
   },

@@ -64,9 +64,10 @@ export const EditMemoryModal: React.FC<Props> = ({
       onError('Title cannot be empty and must be 60 characters or fewer.');
       return;
     }
-    if (description.trim().length < 5 || description.trim().length > 500) {
-      onError('Description must be between 5 and 500 characters.');
-      return;
+
+    let finalDesc = description.trim();
+    if (finalDesc.length < 5) {
+      finalDesc = finalDesc ? `${finalDesc} (${title.trim()})` : `${title.trim()} - Memory entry.`;
     }
 
     setSaving(true);
@@ -83,7 +84,7 @@ export const EditMemoryModal: React.FC<Props> = ({
       await api.updateMemory(memory.memoryId, {
         title: title.trim(),
         date,
-        description: description.trim(),
+        description: finalDesc,
         category,
         mood,
         location_name: locationName.trim(),

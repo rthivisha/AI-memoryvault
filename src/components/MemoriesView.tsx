@@ -127,8 +127,8 @@ export const MemoriesView: React.FC<Props> = ({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch {
-      alert('Failed to export memories.');
+    } catch (err: any) {
+      console.error('Failed to export memories:', err);
     } finally {
       setExporting(false);
     }

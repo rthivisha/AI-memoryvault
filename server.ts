@@ -369,7 +369,7 @@ function verifyPassword(password: string, storedHash: string, salt: string): { v
 
 function createAccessToken(userId: string, username: string): string {
   const now = Math.floor(Date.now() / 1000);
-  const exp = now + 15 * 60; // 15 minutes
+  const exp = now + 7 * 24 * 3600; // 7 days (prevents media streaming tokens from expiring mid-session)
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
   const payload = Buffer.from(JSON.stringify({ sub: userId, username, iat: now, exp })).toString('base64url');
   const sig = crypto.createHmac('sha256', SECRET_KEY).update(`${header}.${payload}`).digest('base64url');
@@ -565,8 +565,12 @@ autoMigrateCsvIfEmpty();
 // Express Setup & Middleware
 // ----------------------------------------------------
 const app = express();
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use((_req, res, next) => {
+  res.setHeader('Permissions-Policy', 'microphone=*, camera=*, display-capture=*');
+  next();
+});
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
 interface AuthRequest extends Request {
   user?: any;
@@ -601,9 +605,9 @@ function requireAuth(req: AuthRequest, res: Response, next: NextFunction): void 
   next();
 }
 
-// Multer upload setup
+// Multer upload setup with 100MB limit per file
 const upload = multer({
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 100 * 1024 * 1024, files: 25 }, // 100MB per file, up to 25 files
   storage: multer.memoryStorage(),
 });
 
@@ -977,26 +981,33 @@ app.post('/api/memories', requireAuth, (req: AuthRequest, res) => {
   const uid = req.user.id;
   const { title, date: dateStr, description, category, mood, location_name, latitude, longitude, people, tags, collection_id, is_favorite, is_pinned } = req.body || {};
 
-  if (!title || !title.trim()) {
-    res.status(400).json({ error: 'Title cannot be empty and must be 60 characters or fewer.' });
-    return;
+  let cleanTitle = (title && typeof title === 'string') ? title.trim() : '';
+  if (!cleanTitle) {
+    cleanTitle = `Memory Note - ${new Date().toISOString().split('T')[0]}`;
   }
-  if (!description || description.trim().length < 5) {
-    res.status(400).json({ error: 'Description must be between 5 and 500 characters.' });
-    return;
+  if (cleanTitle.length > 100) {
+    cleanTitle = cleanTitle.substring(0, 100);
   }
 
-  const { category: suggestedCat, confidence } = classify(title.trim(), description.trim());
+  let cleanDesc = (description && typeof description === 'string') ? description.trim() : '';
+  if (cleanDesc.length < 5) {
+    cleanDesc = cleanDesc.length > 0 ? `${cleanDesc} (${cleanTitle})` : `${cleanTitle} - Encrypted memory vault record.`;
+  }
+  if (cleanDesc.length > 2000) {
+    cleanDesc = cleanDesc.substring(0, 2000);
+  }
+
+  const { category: suggestedCat, confidence } = classify(cleanTitle, cleanDesc);
   const finalCat = category ? String(category).toUpperCase() : suggestedCat;
 
   // Extract keywords
   const corpusRows: any[] = db.prepare('SELECT title, description_encrypted FROM memories WHERE owner_id = ?').all(uid);
   const corpus = corpusRows.map(r => `${r.title} ${decryptText(r.description_encrypted, uid)}`);
-  const keywords = extractKeywords(corpus, title.trim(), description.trim());
+  const keywords = extractKeywords(corpus, cleanTitle, cleanDesc);
 
   const mid = `M${crypto.randomBytes(4).toString('hex')}`;
   const now = new Date().toISOString();
-  const descEncrypted = encryptText(description.trim(), uid);
+  const descEncrypted = encryptText(cleanDesc, uid);
 
   db.prepare(`
     INSERT INTO memories (
@@ -1067,6 +1078,8 @@ app.get('/api/memories/search', requireAuth, (req: AuthRequest, res) => {
       WHERE mt.memory_id = ?
     `).all(r.id);
 
+    const attachments = db.prepare('SELECT id, original_filename, mime_type, file_size FROM attachments WHERE memory_id = ?').all(r.id);
+
     let matchCount = 0;
     const why: string[] = [];
     for (const t of tokens) {
@@ -1082,6 +1095,12 @@ app.get('/api/memories/search', requireAuth, (req: AuthRequest, res) => {
       } else if (tags.some((tag: any) => tag.name.toLowerCase().includes(t))) {
         matchCount += 1.3;
         why.push(`Tag folder matches '${t}'`);
+      } else if (attachments.some((att: any) => att.original_filename.toLowerCase().includes(t))) {
+        matchCount += 1.5;
+        why.push(`Attachment filename matches '${t}'`);
+      } else if (attachments.some((att: any) => att.mime_type.toLowerCase().includes(t))) {
+        matchCount += 1.2;
+        why.push(`Attachment media type matches '${t}'`);
       } else if (t.length >= 5 && docTokens.some(dt => levenshteinDistance(t, dt) <= 1)) {
         matchCount += 0.8;
         why.push(`Fuzzy match with '${t}'`);
@@ -1102,6 +1121,7 @@ app.get('/api/memories/search', requireAuth, (req: AuthRequest, res) => {
           mood: r.mood || 'neutral',
           isFavorite: Boolean(r.is_favorite),
           tags,
+          attachments,
         },
         score: Math.min(score, 1.0),
         bm25Score: Math.round(score * 1.5 * 100) / 100,
@@ -1256,66 +1276,87 @@ app.delete('/api/memories/:id/purge', requireAuth, (req: AuthRequest, res) => {
   res.json({ message: `Memory '${mid}' permanently purged.`, memoryId: mid });
 });
 
-// 12. Attachments Upload & Streaming (Photos, Voice Recordings, Audio, Documents)
-app.post('/api/memories/:id/attachments', requireAuth, upload.any(), (req: AuthRequest, res) => {
-  const uid = req.user.id;
-  const mid = req.params.id;
-  const files = (req.files as Express.Multer.File[]) || [];
-
-  // Verify memory belongs to user
-  const mem = db.prepare('SELECT id FROM memories WHERE id = ? AND owner_id = ?').get(mid, uid);
-  if (!mem) {
-    res.status(404).json({ error: `No memory record with ID '${mid}' exists for the current user.` });
-    return;
-  }
-
-  const saved = [];
-  const userDir = path.join(STORAGE_DIR, uid);
-  fs.mkdirSync(userDir, { recursive: true });
-
-  for (const f of files) {
-    const aid = `A${crypto.randomBytes(4).toString('hex')}`;
-    let ext = path.extname(f.originalname).toLowerCase();
-    let mime = f.mimetype || 'application/octet-stream';
-
-    // Auto-detect extension and MIME for voice recordings and media
-    if (!ext) {
-      if (mime.includes('webm')) ext = '.webm';
-      else if (mime.includes('wav')) ext = '.wav';
-      else if (mime.includes('ogg')) ext = '.ogg';
-      else if (mime.includes('mpeg') || mime.includes('mp3')) ext = '.mp3';
-      else if (mime.includes('mp4') || mime.includes('m4a')) ext = '.m4a';
-      else if (mime.includes('png')) ext = '.png';
-      else if (mime.includes('jpeg') || mime.includes('jpg')) ext = '.jpg';
-      else if (mime.includes('webp')) ext = '.webp';
-      else if (mime.includes('pdf')) ext = '.pdf';
-      else ext = '.bin';
-    } else {
-      if (ext === '.webm' && mime === 'application/octet-stream') mime = 'audio/webm';
-      else if (ext === '.wav' && mime === 'application/octet-stream') mime = 'audio/wav';
-      else if (ext === '.mp3' && mime === 'application/octet-stream') mime = 'audio/mpeg';
-      else if (ext === '.m4a' && mime === 'application/octet-stream') mime = 'audio/mp4';
-      else if (ext === '.jpg' || ext === '.jpeg') mime = 'image/jpeg';
-      else if (ext === '.png') mime = 'image/png';
-      else if (ext === '.webp') mime = 'image/webp';
+// 12. Attachments Upload & Streaming (Photos, Videos, Voice Recordings, Audio, Documents)
+app.post('/api/memories/:id/attachments', requireAuth, (req: AuthRequest, res) => {
+  upload.any()(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        res.status(400).json({ error: 'File size exceeds maximum allowed limit (100MB).' });
+        return;
+      }
+      res.status(400).json({ error: `Upload error: ${err.message}` });
+      return;
     }
 
-    const cleanOrigName = f.originalname.includes('.') ? f.originalname : `${f.originalname}${ext}`;
-    const storedName = `${aid}${ext}`;
-    const filePath = path.join(userDir, storedName);
+    const uid = req.user.id;
+    const mid = req.params.id;
+    const files = (req.files as Express.Multer.File[]) || [];
 
-    // Write file to disk
-    fs.writeFileSync(filePath, f.buffer);
+    // Verify memory belongs to user
+    const mem = db.prepare('SELECT id FROM memories WHERE id = ? AND owner_id = ?').get(mid, uid);
+    if (!mem) {
+      res.status(404).json({ error: `No memory record with ID '${mid}' exists for the current user.` });
+      return;
+    }
 
-    db.prepare(`
-      INSERT INTO attachments (id, memory_id, owner_id, original_filename, stored_filename, mime_type, file_size, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(aid, mid, uid, cleanOrigName, storedName, mime, f.size, new Date().toISOString());
+    const saved = [];
+    const userDir = path.join(STORAGE_DIR, uid);
+    fs.mkdirSync(userDir, { recursive: true });
 
-    saved.push({ id: aid, filename: cleanOrigName, mimeType: mime, size: f.size });
-  }
+    for (const f of files) {
+      const aid = `A${crypto.randomBytes(4).toString('hex')}`;
+      let ext = path.extname(f.originalname).toLowerCase();
+      let mime = f.mimetype || 'application/octet-stream';
 
-  res.json(saved);
+      // Auto-detect extension and MIME for video, voice recordings, photos, and docs
+      if (!ext) {
+        if (mime.includes('video/mp4') || (mime.includes('mp4') && !mime.includes('audio'))) ext = '.mp4';
+        else if (mime.includes('quicktime') || mime.includes('mov')) ext = '.mov';
+        else if (mime.includes('video/webm')) ext = '.webm';
+        else if (mime.includes('audio/webm') || mime.includes('webm')) ext = '.webm';
+        else if (mime.includes('matroska') || mime.includes('mkv')) ext = '.mkv';
+        else if (mime.includes('avi')) ext = '.avi';
+        else if (mime.includes('wav')) ext = '.wav';
+        else if (mime.includes('ogg')) ext = mime.includes('video') ? '.ogv' : '.ogg';
+        else if (mime.includes('mpeg') || mime.includes('mp3')) ext = '.mp3';
+        else if (mime.includes('audio/mp4') || mime.includes('m4a') || mime.includes('aac')) ext = '.m4a';
+        else if (mime.includes('png')) ext = '.png';
+        else if (mime.includes('jpeg') || mime.includes('jpg')) ext = '.jpg';
+        else if (mime.includes('webp')) ext = '.webp';
+        else if (mime.includes('pdf')) ext = '.pdf';
+        else ext = '.bin';
+      } else {
+        if (ext === '.mp4' && (mime === 'application/octet-stream' || !mime)) mime = 'video/mp4';
+        else if (ext === '.mov' && (mime === 'application/octet-stream' || !mime)) mime = 'video/quicktime';
+        else if (ext === '.webm' && (mime === 'application/octet-stream' || !mime)) mime = 'video/webm';
+        else if (ext === '.mkv' && (mime === 'application/octet-stream' || !mime)) mime = 'video/x-matroska';
+        else if (ext === '.avi' && (mime === 'application/octet-stream' || !mime)) mime = 'video/x-msvideo';
+        else if (ext === '.wav' && (mime === 'application/octet-stream' || !mime)) mime = 'audio/wav';
+        else if (ext === '.mp3' && (mime === 'application/octet-stream' || !mime)) mime = 'audio/mpeg';
+        else if (ext === '.m4a' && (mime === 'application/octet-stream' || !mime)) mime = 'audio/mp4';
+        else if (ext === '.ogg' && (mime === 'application/octet-stream' || !mime)) mime = 'audio/ogg';
+        else if (ext === '.jpg' || ext === '.jpeg') mime = 'image/jpeg';
+        else if (ext === '.png') mime = 'image/png';
+        else if (ext === '.webp') mime = 'image/webp';
+      }
+
+      const cleanOrigName = f.originalname.includes('.') ? f.originalname : `${f.originalname}${ext}`;
+      const storedName = `${aid}${ext}`;
+      const filePath = path.join(userDir, storedName);
+
+      // Write file to disk
+      fs.writeFileSync(filePath, f.buffer);
+
+      db.prepare(`
+        INSERT INTO attachments (id, memory_id, owner_id, original_filename, stored_filename, mime_type, file_size, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(aid, mid, uid, cleanOrigName, storedName, mime, f.size, new Date().toISOString());
+
+      saved.push({ id: aid, filename: cleanOrigName, mimeType: mime, size: f.size });
+    }
+
+    res.json(saved);
+  });
 });
 
 app.get('/api/attachments/:id', (req, res) => {
@@ -1342,10 +1383,57 @@ app.get('/api/attachments/:id', (req, res) => {
     return;
   }
 
-  res.setHeader('Accept-Ranges', 'bytes');
-  res.setHeader('Content-Type', att.mime_type);
-  res.setHeader('Content-Disposition', `inline; filename="${att.original_filename}"`);
-  fs.createReadStream(filePath).pipe(res);
+  const stat = fs.statSync(filePath);
+  const fileSize = stat.size;
+  const range = req.headers.range;
+
+  let contentType = att.mime_type || 'application/octet-stream';
+  const ext = path.extname(att.original_filename || '').toLowerCase();
+  if (ext === '.mp3') contentType = 'audio/mpeg';
+  else if (ext === '.wav') contentType = 'audio/wav';
+  else if (ext === '.m4a') contentType = 'audio/mp4';
+  else if (ext === '.ogg') contentType = 'audio/ogg';
+  else if (ext === '.webm' && (contentType.includes('audio') || (att.original_filename || '').toLowerCase().includes('voice'))) contentType = 'audio/webm';
+  else if (ext === '.webm') contentType = 'video/webm';
+  else if (ext === '.mp4') contentType = 'video/mp4';
+  else if (ext === '.mov') contentType = 'video/quicktime';
+  else if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
+  else if (ext === '.png') contentType = 'image/png';
+  else if (ext === '.webp') contentType = 'image/webp';
+  else if (ext === '.pdf') contentType = 'application/pdf';
+
+  // HTTP 206 Partial Content for instant streaming of audio and video without loading freezes
+  if (range) {
+    const parts = range.replace(/bytes=/, '').split('-');
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+    if (start >= fileSize) {
+      res.status(416).send(`Requested range not satisfiable\n${start} >= ${fileSize}`);
+      return;
+    }
+
+    const chunkSize = (end - start) + 1;
+    const file = fs.createReadStream(filePath, { start, end });
+    res.writeHead(206, {
+      'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': chunkSize,
+      'Content-Type': contentType,
+      'Content-Disposition': `inline; filename="${encodeURIComponent(att.original_filename)}"`,
+      'Cache-Control': 'public, max-age=86400',
+    });
+    file.pipe(res);
+  } else {
+    res.writeHead(200, {
+      'Content-Length': fileSize,
+      'Accept-Ranges': 'bytes',
+      'Content-Type': contentType,
+      'Content-Disposition': `inline; filename="${encodeURIComponent(att.original_filename)}"`,
+      'Cache-Control': 'public, max-age=86400',
+    });
+    fs.createReadStream(filePath).pipe(res);
+  }
 });
 
 app.delete('/api/attachments/:id', requireAuth, (req: AuthRequest, res) => {
@@ -1360,16 +1448,16 @@ app.delete('/api/attachments/:id', requireAuth, (req: AuthRequest, res) => {
   res.json({ message: 'Attachment deleted.' });
 });
 
-// Gallery Media
+// Gallery Media (Images, Audio, Voice Notes & Videos)
 app.get('/api/gallery', requireAuth, (req: AuthRequest, res) => {
   const uid = req.user.id;
-  const { category, year } = req.query;
+  const { category, year, type } = req.query;
 
   let query = `
     SELECT a.*, m.title as memory_title, m.category as memory_category, m.memory_date
     FROM attachments a
     JOIN memories m ON a.memory_id = m.id
-    WHERE a.owner_id = ? AND a.mime_type LIKE 'image/%' AND m.deleted_at IS NULL
+    WHERE a.owner_id = ? AND m.deleted_at IS NULL
   `;
   const params: any[] = [uid];
   if (category) {
@@ -1380,7 +1468,14 @@ app.get('/api/gallery', requireAuth, (req: AuthRequest, res) => {
     query += ' AND m.memory_date LIKE ?';
     params.push(`${year}%`);
   }
-  query += ' ORDER BY m.memory_date DESC';
+  if (type === 'image' || type === 'photo') {
+    query += ` AND (a.mime_type LIKE 'image/%' OR a.original_filename LIKE '%.jpg' OR a.original_filename LIKE '%.jpeg' OR a.original_filename LIKE '%.png' OR a.original_filename LIKE '%.webp' OR a.original_filename LIKE '%.gif')`;
+  } else if (type === 'audio' || type === 'voice') {
+    query += ` AND (a.mime_type LIKE 'audio/%' OR a.original_filename LIKE '%.mp3' OR a.original_filename LIKE '%.wav' OR a.original_filename LIKE '%.m4a' OR a.original_filename LIKE '%.ogg' OR a.original_filename LIKE '%.webm' OR a.original_filename LIKE 'Voice_Recording%')`;
+  } else if (type === 'video') {
+    query += ` AND (a.mime_type LIKE 'video/%' OR a.original_filename LIKE '%.mp4' OR a.original_filename LIKE '%.mov' OR a.original_filename LIKE '%.mkv' OR a.original_filename LIKE '%.avi')`;
+  }
+  query += ' ORDER BY m.memory_date DESC, a.created_at DESC';
 
   const rows = db.prepare(query).all(...params);
   res.json(rows);
