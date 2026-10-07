@@ -8,49 +8,43 @@ interface Props {
 
 export const CATEGORY_CONFIG: Record<
   CategoryType,
-  { label: string; bg: string; text: string; border: string; dot: string }
+  { label: string; text: string; dot: string; glow: string }
 > = {
   ACHIEVEMENT: {
     label: 'Achievement',
-    bg: 'bg-emerald-500/10',
-    text: 'text-emerald-400',
-    border: 'border-emerald-500/30',
-    dot: 'bg-emerald-400',
+    text: 'text-amber-300',
+    dot: 'bg-amber-400',
+    glow: 'shadow-[0_0_8px_rgba(245,158,11,0.5)]',
   },
   EVENT: {
     label: 'Event',
-    bg: 'bg-purple-500/10',
-    text: 'text-purple-400',
-    border: 'border-purple-500/30',
-    dot: 'bg-purple-400',
+    text: 'text-sky-300',
+    dot: 'bg-sky-400',
+    glow: 'shadow-[0_0_8px_rgba(56,189,248,0.5)]',
   },
   STUDY: {
     label: 'Study',
-    bg: 'bg-sky-500/10',
-    text: 'text-sky-400',
-    border: 'border-sky-500/30',
-    dot: 'bg-sky-400',
+    text: 'text-emerald-300',
+    dot: 'bg-emerald-400',
+    glow: 'shadow-[0_0_8px_rgba(52,211,153,0.5)]',
   },
   TRAVEL: {
     label: 'Travel',
-    bg: 'bg-amber-500/10',
-    text: 'text-amber-400',
-    border: 'border-amber-500/30',
-    dot: 'bg-amber-400',
+    text: 'text-cyan-300',
+    dot: 'bg-cyan-400',
+    glow: 'shadow-[0_0_8px_rgba(6,182,212,0.5)]',
   },
   REMINDER: {
     label: 'Reminder',
-    bg: 'bg-rose-500/10',
-    text: 'text-rose-400',
-    border: 'border-rose-500/30',
+    text: 'text-rose-300',
     dot: 'bg-rose-400',
+    glow: 'shadow-[0_0_8px_rgba(251,113,133,0.5)]',
   },
   PERSONAL: {
     label: 'Personal',
-    bg: 'bg-slate-500/10',
-    text: 'text-slate-300',
-    border: 'border-slate-500/30',
-    dot: 'bg-slate-400',
+    text: 'text-violet-300',
+    dot: 'bg-violet-400',
+    glow: 'shadow-[0_0_8px_rgba(167,139,250,0.5)]',
   },
 };
 
@@ -60,16 +54,14 @@ export const CategoryBadge: React.FC<Props> = ({ category, size = 'sm' }) => {
 
   const sizeClasses =
     size === 'lg'
-      ? 'px-3 py-1 text-xs font-semibold'
+      ? 'text-xs font-semibold'
       : size === 'md'
-      ? 'px-2.5 py-0.5 text-xs font-medium'
-      : 'px-2 py-0.5 text-[11px] font-medium tracking-wide';
+      ? 'text-xs font-medium'
+      : 'text-[11px] font-medium tracking-tight';
 
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full border ${config.bg} ${config.text} ${config.border} ${sizeClasses}`}
-    >
-      <span className={`w-1.5 h-1.5 rounded-full ${config.dot}`} />
+    <span className={`inline-flex items-center gap-1.5 ${config.text} ${sizeClasses}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${config.dot} ${config.glow}`} />
       <span>{config.label}</span>
     </span>
   );

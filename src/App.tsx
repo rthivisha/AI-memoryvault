@@ -86,6 +86,18 @@ export default function App() {
     return () => window.removeEventListener('auth:expired', handleAuthExpired);
   }, [addToast]);
 
+  // Global keyboard shortcut (Cmd+K / Ctrl+K) for instant search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setActiveTab('search');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // Verify stored user session on mount
   useEffect(() => {
     if (user) {
@@ -190,7 +202,12 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-cyan-500/20 selection:text-cyan-300 flex flex-col">
+    <div className="min-h-screen bg-[#07090E] text-slate-100 font-sans selection:bg-cyan-500/25 selection:text-cyan-200 flex flex-col relative overflow-x-hidden">
+      {/* Ambient background glows */}
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[1100px] h-[350px] bg-[radial-gradient(ellipse_at_top,rgba(6,182,212,0.08),transparent_70%)] pointer-events-none -z-10" />
+      <div className="fixed -bottom-40 -right-40 w-96 h-96 bg-teal-500/5 rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="fixed top-1/3 -left-40 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none -z-10" />
+
       {/* Toast notifications */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
@@ -204,7 +221,7 @@ export default function App() {
       />
 
       {/* Main Content Viewport */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-7">
         {!user ? (
           <AuthModal
             onLoginSuccess={handleLoginSuccess}
@@ -304,16 +321,20 @@ export default function App() {
         />
       )}
 
-      {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950 py-6 text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <span>AI MemoVault • Secure Personal Knowledge Platform</span>
-          <div className="flex items-center gap-4 text-[11px]">
-            <span>SQLite WAL with Encryption at Rest</span>
-            <span aria-hidden="true">·</span>
-            <span>Zero External ML Libraries</span>
-            <span aria-hidden="true">·</span>
-            <span>Hand-Crafted Lexical Retrieval</span>
+      {/* Sleek Footer */}
+      <footer className="border-t border-white/[0.06] bg-[#07090E]/60 py-6 text-xs text-slate-500">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-slate-300">AI MemoVault</span>
+            <span aria-hidden="true" className="text-slate-700">·</span>
+            <span>Personal Knowledge &amp; Media Vault</span>
+          </div>
+          <div className="flex items-center gap-3 text-[11px] text-slate-500">
+            <span>SQLite WAL with AES-256</span>
+            <span aria-hidden="true" className="text-slate-700">·</span>
+            <span>Lexical BM25 Search</span>
+            <span aria-hidden="true" className="text-slate-700">·</span>
+            <span>Zero External Cloud Tracking</span>
           </div>
         </div>
       </footer>

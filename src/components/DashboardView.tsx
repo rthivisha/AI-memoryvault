@@ -8,7 +8,7 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  PlusCircle,
+  Plus,
   Search,
   ArrowRight,
   Smile,
@@ -49,12 +49,12 @@ interface Props {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  ACHIEVEMENT: '#eab308', // Amber/Gold
-  EVENT: '#3b82f6',       // Blue
-  STUDY: '#10b981',       // Emerald
-  TRAVEL: '#06b6d4',       // Cyan
-  REMINDER: '#f97316',     // Orange
-  PERSONAL: '#a855f7',     // Purple
+  ACHIEVEMENT: '#F59E0B', // Amber
+  EVENT: '#3B82F6',       // Blue
+  STUDY: '#10B981',       // Emerald
+  TRAVEL: '#06B6D4',       // Cyan
+  REMINDER: '#F97316',     // Orange
+  PERSONAL: '#8B5CF6',     // Purple
 };
 
 const MOOD_EMOJIS: Record<string, string> = {
@@ -124,28 +124,28 @@ export const DashboardView: React.FC<Props> = ({
 
     // Split into 7 rows (Sunday to Saturday)
     const rows: { dateStr: string; count: number }[][] = Array.from({ length: 7 }, () => []);
-    days.forEach(d => {
+    days.forEach((d) => {
       rows[d.dayOfWeek].push(d);
     });
 
     const getIntensityClass = (count: number) => {
-      if (count === 0) return 'bg-slate-900 border-slate-800/80 hover:border-slate-700';
-      if (count === 1) return 'bg-cyan-950 border-cyan-800 text-cyan-300';
-      if (count === 2) return 'bg-cyan-800 border-cyan-600 text-cyan-200';
-      if (count === 3) return 'bg-teal-600 border-teal-500 text-slate-950 font-bold';
-      return 'bg-emerald-400 border-emerald-300 text-slate-950 font-bold';
+      if (count === 0) return 'bg-white/[0.04] border-white/[0.04] hover:border-slate-500';
+      if (count === 1) return 'bg-cyan-950/80 border-cyan-800 text-cyan-300';
+      if (count === 2) return 'bg-cyan-700 border-cyan-500 text-cyan-100 shadow-[0_0_8px_rgba(6,182,212,0.3)]';
+      if (count === 3) return 'bg-teal-500 border-teal-400 text-slate-950 font-bold shadow-[0_0_10px_rgba(20,184,166,0.4)]';
+      return 'bg-emerald-400 border-emerald-300 text-slate-950 font-bold shadow-[0_0_12px_rgba(52,211,153,0.5)]';
     };
 
     return (
       <div className="overflow-x-auto pb-2 scrollbar-thin">
-        <div className="min-w-[720px] flex flex-col gap-1">
+        <div className="min-w-[720px] flex flex-col gap-1.5">
           {rows.map((row, rowIdx) => (
-            <div key={rowIdx} className="flex gap-1 items-center">
+            <div key={rowIdx} className="flex gap-1.5 items-center">
               <span className="w-6 text-[10px] font-mono text-slate-500 text-right pr-1 select-none">
                 {rowIdx === 1 ? 'Mon' : rowIdx === 3 ? 'Wed' : rowIdx === 5 ? 'Fri' : ''}
               </span>
               <div className="flex gap-1 flex-1">
-                {row.map(cell => (
+                {row.map((cell) => (
                   <button
                     key={cell.dateStr}
                     type="button"
@@ -155,7 +155,7 @@ export const DashboardView: React.FC<Props> = ({
                       }
                     }}
                     title={`${cell.dateStr}: ${cell.count} ${cell.count === 1 ? 'memory' : 'memories'}`}
-                    className={`w-3 h-3 rounded-[2px] border transition-transform hover:scale-125 focus:outline-none ${getIntensityClass(
+                    className={`w-3 h-3 rounded-[3px] border transition-all duration-200 hover:scale-125 focus:outline-none cursor-pointer ${getIntensityClass(
                       cell.count
                     )}`}
                   />
@@ -164,14 +164,14 @@ export const DashboardView: React.FC<Props> = ({
             </div>
           ))}
         </div>
-        <div className="flex items-center justify-between text-[11px] font-mono text-slate-500 mt-2 px-6">
-          <span>Click any active date to filter memories</span>
+        <div className="flex items-center justify-between text-[11px] font-mono text-slate-500 mt-3 px-6">
+          <span>Click any recorded date to filter memory records</span>
           <div className="flex items-center gap-1.5">
             <span>Less</span>
-            <span className="w-2.5 h-2.5 rounded-[2px] bg-slate-900 border border-slate-800" />
+            <span className="w-2.5 h-2.5 rounded-[2px] bg-white/[0.04] border border-white/[0.06]" />
             <span className="w-2.5 h-2.5 rounded-[2px] bg-cyan-950 border border-cyan-800" />
-            <span className="w-2.5 h-2.5 rounded-[2px] bg-cyan-800 border border-cyan-600" />
-            <span className="w-2.5 h-2.5 rounded-[2px] bg-teal-600 border border-teal-500" />
+            <span className="w-2.5 h-2.5 rounded-[2px] bg-cyan-700 border border-cyan-500" />
+            <span className="w-2.5 h-2.5 rounded-[2px] bg-teal-500 border border-teal-400" />
             <span className="w-2.5 h-2.5 rounded-[2px] bg-emerald-400 border border-emerald-300" />
             <span>More</span>
           </div>
@@ -186,102 +186,111 @@ export const DashboardView: React.FC<Props> = ({
 
   return (
     <div className="space-y-6">
-      {/* Top Banner & Quick Actions */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 relative overflow-hidden">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Top Hero Banner & Quick Actions */}
+      <div className="glass-panel rounded-2xl p-6 sm:p-7 relative overflow-hidden shadow-xl border border-white/[0.08]">
+        {/* Subtle decorative radial glow */}
+        <div className="absolute top-0 right-0 w-80 h-80 bg-[radial-gradient(ellipse_at_top_right,rgba(6,182,212,0.12),transparent_70%)] pointer-events-none" />
+
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
           <div>
-            <div className="flex items-center gap-2 text-xs font-mono text-cyan-400 mb-1">
-              <span>Vault v2.0 Active</span>
-              <span aria-hidden="true">·</span>
-              <span>SQLite with Encryption at Rest</span>
-              <span aria-hidden="true">·</span>
+            <div className="flex items-center gap-2 text-xs font-mono text-cyan-400 mb-1.5">
+              <span>Encrypted Vault Active</span>
+              <span aria-hidden="true" className="text-slate-600">·</span>
+              <span>AES-256 Storage</span>
+              <span aria-hidden="true" className="text-slate-600">·</span>
               <span>Lexical Retrieval Core</span>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-white">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
               Welcome back, {user.displayName || user.username}
             </h1>
-            <p className="text-sm text-slate-400 mt-1 max-w-2xl">
-              Your personal life knowledge repository. Hand-written lexical AI with zero external ML dependencies.
+            <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed">
+              Your personal life knowledge repository. Hand-written lexical AI with instant search, voice reflections, and photo vault.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
             <button
               onClick={() => onNavigate('add')}
-              className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
+              className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-400 hover:from-cyan-400 hover:to-teal-300 text-slate-950 font-bold text-xs rounded-xl transition-all shadow-[0_0_20px_rgba(6,182,212,0.25)] hover:shadow-[0_0_25px_rgba(6,182,212,0.4)] flex items-center gap-1.5 cursor-pointer"
             >
-              <PlusCircle className="w-4 h-4" />
+              <Plus className="w-4 h-4 stroke-[2.5]" />
               <span>Record Memory</span>
             </button>
             <button
               onClick={() => onNavigate('search')}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700 transition-colors flex items-center gap-1.5"
+              className="px-3.5 py-2 bg-white/[0.05] hover:bg-white/[0.1] text-slate-200 text-xs font-medium rounded-xl border border-white/[0.08] hover:border-white/[0.15] transition-all flex items-center gap-1.5 cursor-pointer"
             >
-              <Search className="w-4 h-4 text-cyan-400" />
-              <span>Smart Search</span>
+              <Search className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Search Vault</span>
             </button>
             <button
               onClick={() => onNavigate('gallery')}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700 transition-colors flex items-center gap-1.5"
+              className="px-3.5 py-2 bg-white/[0.05] hover:bg-white/[0.1] text-slate-200 text-xs font-medium rounded-xl border border-white/[0.08] hover:border-white/[0.15] transition-all flex items-center gap-1.5 cursor-pointer"
             >
-              <ImageIcon className="w-4 h-4 text-teal-400" />
-              <span>Gallery</span>
+              <ImageIcon className="w-3.5 h-3.5 text-teal-400" />
+              <span>Media Gallery</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* KPI Cards Row (Tabular Figures & Zero-Pill) */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      {/* KPI Cards Row (Tabular Figures & Sleek Elevation) */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
         {/* Total Memories */}
         <div
           onClick={() => onNavigate('memories')}
-          className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-cyan-500/50 transition-all cursor-pointer group"
+          className="glass-panel glass-panel-hover p-4 sm:p-5 rounded-2xl cursor-pointer group"
         >
           <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-            <span>Total Records</span>
-            <TrendingUp className="w-4 h-4 text-cyan-400 group-hover:translate-x-0.5 transition-transform" />
+            <span className="font-medium">Total Records</span>
+            <div className="p-1 rounded-md bg-cyan-500/10 text-cyan-400">
+              <TrendingUp className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+            </div>
           </div>
-          <div className="text-2xl font-bold text-white tabular-nums">
+          <div className="text-2xl sm:text-3xl font-extrabold text-white tabular-nums tracking-tight">
             {kpis?.totalMemories ?? 0}
           </div>
-          <div className="text-xs text-slate-500 mt-1">
-            <span className="text-cyan-400 font-medium tabular-nums">{kpis?.thisMonthCount ?? 0}</span> this month
+          <div className="text-[11px] text-slate-400 mt-1.5">
+            <span className="text-cyan-400 font-semibold tabular-nums">{kpis?.thisMonthCount ?? 0}</span> added this month
           </div>
         </div>
 
         {/* Current & Longest Streak */}
-        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+        <div className="glass-panel glass-panel-hover p-4 sm:p-5 rounded-2xl">
           <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-            <span>Daily Streak</span>
-            <Flame className="w-4 h-4 text-amber-400" />
+            <span className="font-medium">Daily Streak</span>
+            <div className="p-1 rounded-md bg-amber-500/10 text-amber-400">
+              <Flame className="w-3.5 h-3.5" />
+            </div>
           </div>
-          <div className="text-2xl font-bold text-white tabular-nums flex items-baseline gap-1.5">
+          <div className="text-2xl sm:text-3xl font-extrabold text-white tabular-nums tracking-tight flex items-baseline gap-1.5">
             <span>{kpis?.currentStreak ?? 0}</span>
             <span className="text-xs font-normal text-slate-400">days</span>
           </div>
-          <div className="text-xs text-slate-500 mt-1">
-            Longest: <span className="text-slate-300 font-medium tabular-nums">{kpis?.longestStreak ?? 0} days</span>
+          <div className="text-[11px] text-slate-400 mt-1.5">
+            Best: <span className="text-slate-200 font-semibold tabular-nums">{kpis?.longestStreak ?? 0} days</span>
           </div>
         </div>
 
         {/* Storage Quota */}
-        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+        <div className="glass-panel glass-panel-hover p-4 sm:p-5 rounded-2xl">
           <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-            <span>Storage Used</span>
-            <HardDrive className="w-4 h-4 text-emerald-400" />
+            <span className="font-medium">Storage Used</span>
+            <div className="p-1 rounded-md bg-emerald-500/10 text-emerald-400">
+              <HardDrive className="w-3.5 h-3.5" />
+            </div>
           </div>
-          <div className="text-2xl font-bold text-white tabular-nums flex items-baseline gap-1">
+          <div className="text-2xl sm:text-3xl font-extrabold text-white tabular-nums tracking-tight flex items-baseline gap-1">
             <span>{storageMbUsed}</span>
             <span className="text-xs font-normal text-slate-400">MB</span>
           </div>
-          <div className="mt-2 w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+          <div className="mt-2.5 w-full bg-slate-900/80 rounded-full h-1.5 overflow-hidden border border-white/[0.04]">
             <div
-              className="bg-emerald-500 h-full rounded-full transition-all"
+              className="bg-gradient-to-r from-teal-400 to-emerald-400 h-full rounded-full transition-all duration-500 shadow-sm"
               style={{ width: `${storagePercent}%` }}
             />
           </div>
-          <div className="text-[11px] text-slate-500 mt-1 tabular-nums">
+          <div className="text-[10px] text-slate-400 mt-1.5 tabular-nums">
             {storagePercent}% of 500 MB quota
           </div>
         </div>
@@ -289,27 +298,31 @@ export const DashboardView: React.FC<Props> = ({
         {/* Favorites */}
         <div
           onClick={() => onNavigate('memories')}
-          className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-rose-500/50 transition-all cursor-pointer group"
+          className="glass-panel glass-panel-hover p-4 sm:p-5 rounded-2xl cursor-pointer group"
         >
           <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-            <span>Starred Favorites</span>
-            <Heart className="w-4 h-4 text-rose-400 fill-rose-500/20 group-hover:scale-110 transition-transform" />
+            <span className="font-medium">Favorites</span>
+            <div className="p-1 rounded-md bg-rose-500/10 text-rose-400">
+              <Heart className="w-3.5 h-3.5 fill-rose-500/20 group-hover:scale-110 transition-transform" />
+            </div>
           </div>
-          <div className="text-2xl font-bold text-white tabular-nums">
+          <div className="text-2xl sm:text-3xl font-extrabold text-white tabular-nums tracking-tight">
             {kpis?.favoritesCount ?? 0}
           </div>
-          <div className="text-xs text-slate-500 mt-1">
-            Saved life milestones
+          <div className="text-[11px] text-slate-400 mt-1.5">
+            Key milestones starred
           </div>
         </div>
 
         {/* Reminders Status */}
-        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 col-span-2 sm:col-span-1">
+        <div className="glass-panel glass-panel-hover p-4 sm:p-5 rounded-2xl col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-            <span>Active Reminders</span>
-            <Bell className="w-4 h-4 text-orange-400" />
+            <span className="font-medium">Reminders</span>
+            <div className="p-1 rounded-md bg-orange-500/10 text-orange-400">
+              <Bell className="w-3.5 h-3.5" />
+            </div>
           </div>
-          <div className="text-2xl font-bold text-white tabular-nums flex items-baseline gap-1">
+          <div className="text-2xl sm:text-3xl font-extrabold text-white tabular-nums tracking-tight flex items-baseline gap-1.5">
             <span>{kpis?.upcomingRemindersCount ?? 0}</span>
             {kpis?.overdueRemindersCount ? (
               <span className="text-xs text-rose-400 font-semibold tabular-nums">
@@ -317,21 +330,26 @@ export const DashboardView: React.FC<Props> = ({
               </span>
             ) : null}
           </div>
-          <div className="text-xs text-slate-500 mt-1">
-            Time-bound follow ups
+          <div className="text-[11px] text-slate-400 mt-1.5">
+            Pending scheduled alerts
           </div>
         </div>
       </div>
 
       {/* Activity Heatmap Widget (GitHub Style for past 365 days) */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5">
-        <div className="flex items-center justify-between mb-4">
+      <div className="glass-panel rounded-2xl p-5 sm:p-6 border border-white/[0.08]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
           <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-cyan-400" />
-            <h2 className="text-sm font-semibold text-white">Annual Memory Rhythm (365 Days)</h2>
+            <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
+              <Calendar className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-white tracking-tight">Activity Rhythm (365 Days)</h2>
+              <p className="text-[11px] text-slate-400">Timeline of memories and reflections logged</p>
+            </div>
           </div>
-          <div className="text-xs text-slate-400">
-            Total active days: <span className="text-white font-medium tabular-nums">{Object.keys(summary?.activityHeatmap || {}).length}</span>
+          <div className="text-xs text-slate-400 font-mono">
+            Active days logged: <span className="text-cyan-300 font-semibold tabular-nums">{Object.keys(summary?.activityHeatmap || {}).length}</span>
           </div>
         </div>
         {renderHeatmap()}
@@ -340,13 +358,18 @@ export const DashboardView: React.FC<Props> = ({
       {/* Charts Grid: Category Distribution & Mood Trends */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Category Breakdown Donut */}
-        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5">
+        <div className="glass-panel rounded-2xl p-5 sm:p-6 border border-white/[0.08]">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-white">Categories Breakdown</h2>
-            <div className="text-xs text-slate-500">Tap slice to filter</div>
+            <div>
+              <h2 className="text-sm font-bold text-white tracking-tight">Knowledge Categories</h2>
+              <p className="text-[11px] text-slate-400">Distribution across life areas</p>
+            </div>
+            <div className="text-[11px] font-mono text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/60">
+              Click slice to filter
+            </div>
           </div>
 
-          <div className="h-56 flex items-center justify-center">
+          <div className="h-60 flex items-center justify-center">
             {summary && summary.categoryBreakdown.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -354,9 +377,9 @@ export const DashboardView: React.FC<Props> = ({
                     data={summary.categoryBreakdown}
                     cx="50%"
                     cy="50%"
-                    innerRadius={55}
-                    outerRadius={80}
-                    paddingAngle={3}
+                    innerRadius={60}
+                    outerRadius={85}
+                    paddingAngle={4}
                     dataKey="value"
                     onClick={(entry) => {
                       if (entry && entry.name) {
@@ -369,16 +392,20 @@ export const DashboardView: React.FC<Props> = ({
                       <Cell
                         key={`cell-${entry.name}`}
                         fill={CATEGORY_COLORS[entry.name] || '#64748b'}
+                        stroke="#07090E"
+                        strokeWidth={2}
                       />
                     ))}
                   </Pie>
                   <RechartsTooltip
                     contentStyle={{
-                      backgroundColor: '#0f172a',
-                      borderColor: '#334155',
-                      borderRadius: '8px',
-                      color: '#f8fafc',
+                      backgroundColor: 'rgba(13, 18, 30, 0.95)',
+                      borderColor: 'rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      color: '#F1F5F9',
                       fontSize: '12px',
+                      boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                      backdropFilter: 'blur(12px)',
                     }}
                     formatter={(value: any, name: any) => [`${value} memories`, name]}
                   />
@@ -390,20 +417,20 @@ export const DashboardView: React.FC<Props> = ({
           </div>
 
           {/* Clean unboxed legend with separators */}
-          <div className="flex flex-wrap items-center justify-center gap-3 pt-2 text-xs text-slate-400">
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-3 border-t border-white/[0.06] text-xs text-slate-400">
             {summary?.categoryBreakdown.map((cat, idx) => (
               <button
                 key={cat.name}
                 type="button"
                 onClick={() => onSelectCategoryFilter(cat.name as CategoryType)}
-                className="flex items-center gap-1.5 hover:text-white transition-colors"
+                className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
               >
                 <span
                   className="w-2.5 h-2.5 rounded-full"
                   style={{ backgroundColor: CATEGORY_COLORS[cat.name] || '#64748b' }}
                 />
-                <span>{cat.name}</span>
-                <span className="text-slate-500 tabular-nums">({cat.value})</span>
+                <span className="font-medium">{cat.name}</span>
+                <span className="text-slate-500 font-mono text-[11px] tabular-nums">({cat.value})</span>
                 {idx < summary.categoryBreakdown.length - 1 && (
                   <span className="text-slate-700 ml-1.5" aria-hidden="true">·</span>
                 )}
@@ -413,44 +440,61 @@ export const DashboardView: React.FC<Props> = ({
         </div>
 
         {/* Mood Distribution */}
-        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5">
+        <div className="glass-panel rounded-2xl p-5 sm:p-6 border border-white/[0.08]">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-white">Emotional Archetypes &amp; Moods</h2>
-            <div className="text-xs text-slate-500">Self-reported emotional states</div>
+            <div>
+              <h2 className="text-sm font-bold text-white tracking-tight">Emotional Patterns &amp; Moods</h2>
+              <p className="text-[11px] text-slate-400">Self-reported emotional states logged</p>
+            </div>
+            <div className="text-[11px] font-mono text-slate-400">
+              6 Archetypes
+            </div>
           </div>
 
-          <div className="h-56">
-            {summary && summary.moodDistribution.some(m => m.count > 0) ? (
+          <div className="h-60">
+            {summary && summary.moodDistribution.some((m) => m.count > 0) ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={summary.moodDistribution}
                   margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
                 >
+                  <defs>
+                    <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#06B6D4" stopOpacity={0.9} />
+                      <stop offset="100%" stopColor="#0D9488" stopOpacity={0.5} />
+                    </linearGradient>
+                  </defs>
                   <XAxis
                     dataKey="mood"
                     tick={{ fill: '#94a3b8', fontSize: 11 }}
                     tickFormatter={(val) => `${MOOD_EMOJIS[val] || ''} ${val}`}
+                    axisLine={{ stroke: 'rgba(255,255,255,0.06)' }}
+                    tickLine={false}
                   />
                   <YAxis
                     tick={{ fill: '#94a3b8', fontSize: 11 }}
                     allowDecimals={false}
+                    axisLine={{ stroke: 'rgba(255,255,255,0.06)' }}
+                    tickLine={false}
                   />
                   <RechartsTooltip
                     contentStyle={{
-                      backgroundColor: '#0f172a',
-                      borderColor: '#334155',
-                      borderRadius: '8px',
-                      color: '#f8fafc',
+                      backgroundColor: 'rgba(13, 18, 30, 0.95)',
+                      borderColor: 'rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      color: '#F1F5F9',
                       fontSize: '12px',
+                      boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                      backdropFilter: 'blur(12px)',
                     }}
                     formatter={(val: any) => [`${val} memories`, 'Count']}
                   />
-                  <Bar dataKey="count" fill="#06b6d4" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="count" fill="url(#barGradient)" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-500">
-                Log moods when saving memories to visualize emotional patterns.
+              <div className="h-full flex items-center justify-center text-xs text-slate-500 text-center px-4">
+                Log moods when recording memories to visualize your emotional trajectory over time.
               </div>
             )}
           </div>
@@ -460,13 +504,15 @@ export const DashboardView: React.FC<Props> = ({
       {/* Row: "On This Day" & Upcoming Reminders */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* On This Day Widget */}
-        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5">
+        <div className="glass-panel rounded-2xl p-5 sm:p-6 border border-white/[0.08]">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              <h2 className="text-sm font-semibold text-white">On This Day</h2>
+              <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <h2 className="text-sm font-bold text-white tracking-tight">On This Day</h2>
             </div>
-            <span className="text-xs text-slate-400">Past year anniversaries</span>
+            <span className="text-xs text-slate-400 font-mono">Anniversaries</span>
           </div>
 
           {summary?.onThisDay && summary.onThisDay.length > 0 ? (
@@ -478,22 +524,22 @@ export const DashboardView: React.FC<Props> = ({
                   <div
                     key={mem.memoryId}
                     onClick={() => onSelectMemory(mem)}
-                    className="p-3.5 rounded-lg bg-slate-950/70 border border-slate-800 hover:border-cyan-500/40 transition-all cursor-pointer group"
+                    className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-cyan-500/40 hover:bg-white/[0.04] transition-all cursor-pointer group"
                   >
-                    <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+                    <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-amber-300">
+                        <span className="font-bold text-amber-300">
                           {yearsAgo} {yearsAgo === 1 ? 'year' : 'years'} ago
                         </span>
-                        <span aria-hidden="true">·</span>
+                        <span aria-hidden="true" className="text-slate-700">·</span>
                         <span>{mem.date}</span>
                       </div>
-                      <span className="text-slate-500 font-mono text-[11px]">{mem.category}</span>
+                      <span className="text-slate-400 font-mono text-[11px]">{mem.category}</span>
                     </div>
-                    <h3 className="text-sm font-medium text-white group-hover:text-cyan-300 transition-colors">
+                    <h3 className="text-sm font-semibold text-white group-hover:text-cyan-300 transition-colors">
                       {mem.title}
                     </h3>
-                    <p className="text-xs text-slate-400 mt-1 line-clamp-2">
+                    <p className="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed">
                       {mem.description}
                     </p>
                   </div>
@@ -501,43 +547,45 @@ export const DashboardView: React.FC<Props> = ({
               })}
             </div>
           ) : (
-            <div className="py-8 text-center text-xs text-slate-500">
-              No memories recorded on this month and day in previous years. Keep logging your journey!
+            <div className="py-10 text-center text-xs text-slate-500">
+              No memories recorded on this date in past years. Keep logging to unlock future anniversaries!
             </div>
           )}
         </div>
 
         {/* Reminders & Follow-Ups */}
-        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5">
+        <div className="glass-panel rounded-2xl p-5 sm:p-6 border border-white/[0.08]">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Bell className="w-4 h-4 text-orange-400" />
-              <h2 className="text-sm font-semibold text-white">Upcoming &amp; Pending Reminders</h2>
+              <div className="p-1.5 rounded-lg bg-orange-500/10 text-orange-400">
+                <Bell className="w-4 h-4" />
+              </div>
+              <h2 className="text-sm font-bold text-white tracking-tight">Pending Reminders</h2>
             </div>
-            <span className="text-xs text-slate-400">One-click complete</span>
+            <span className="text-xs text-slate-400 font-mono">Action items</span>
           </div>
 
           {summary?.upcomingReminders && summary.upcomingReminders.length > 0 ? (
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               {summary.upcomingReminders.map((rem) => {
                 const isOverdue = rem.due_at < new Date().toISOString();
                 return (
                   <div
                     key={rem.id}
-                    className="p-3 rounded-lg bg-slate-950/70 border border-slate-800 flex items-center justify-between gap-3"
+                    className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3"
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 text-xs mb-0.5">
-                        <span className={isOverdue ? 'text-rose-400 font-medium' : 'text-cyan-400'}>
+                      <div className="flex items-center gap-2 text-xs mb-1">
+                        <span className={isOverdue ? 'text-rose-400 font-semibold' : 'text-cyan-400 font-medium'}>
                           Due: {rem.due_at.replace('T', ' ')}
                         </span>
                         {isOverdue && (
-                          <span className="text-[10px] text-rose-300 uppercase tracking-wider font-semibold">
+                          <span className="text-[10px] text-rose-300 uppercase tracking-wider font-bold bg-rose-950/80 border border-rose-800 px-1.5 py-0.2 rounded">
                             Overdue
                           </span>
                         )}
                       </div>
-                      <p className="text-sm font-medium text-white truncate">
+                      <p className="text-sm font-semibold text-white truncate">
                         {rem.memory_title || 'Memory reminder'}
                       </p>
                     </div>
@@ -545,18 +593,18 @@ export const DashboardView: React.FC<Props> = ({
                     <button
                       type="button"
                       onClick={(e) => handleCompleteReminder(e, rem.id)}
-                      className="px-2.5 py-1.5 rounded bg-slate-800 hover:bg-emerald-950 hover:text-emerald-300 text-slate-300 text-xs font-medium border border-slate-700 hover:border-emerald-600 transition-colors flex items-center gap-1 shrink-0"
+                      className="px-3 py-1.5 rounded-lg bg-white/[0.05] hover:bg-emerald-950 hover:text-emerald-300 text-slate-300 text-xs font-semibold border border-white/[0.08] hover:border-emerald-600 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Done</span>
+                      <span>Complete</span>
                     </button>
                   </div>
                 );
               })}
             </div>
           ) : (
-            <div className="py-8 text-center text-xs text-slate-500">
-              No pending reminders. Attach reminders to any memory for time-sensitive follow-up.
+            <div className="py-10 text-center text-xs text-slate-500">
+              No pending reminders. Attach reminders to any memory for scheduled follow-ups.
             </div>
           )}
         </div>
@@ -564,10 +612,12 @@ export const DashboardView: React.FC<Props> = ({
 
       {/* Lexical AI Word Cloud */}
       {summary?.wordCloud && summary.wordCloud.length > 0 && (
-        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-white">TF-IDF Conceptual Word Cloud</h2>
-            <div className="text-xs text-slate-400">Lexically prominent terms across your records</div>
+        <div className="glass-panel rounded-2xl p-5 sm:p-6 border border-white/[0.08]">
+          <div className="flex items-center justify-between mb-3.5">
+            <div>
+              <h2 className="text-sm font-bold text-white tracking-tight">Lexical Topic Cloud</h2>
+              <p className="text-[11px] text-slate-400">TF-IDF conceptual keywords extracted from your vault entries</p>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 pt-1">
             {summary.wordCloud.map((item) => (
@@ -575,10 +625,11 @@ export const DashboardView: React.FC<Props> = ({
                 key={item.text}
                 type="button"
                 onClick={() => onNavigate('search')}
-                className="px-2.5 py-1 rounded bg-slate-950 border border-slate-800 hover:border-cyan-500/50 text-slate-300 hover:text-cyan-300 text-xs transition-colors flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.07] hover:border-cyan-500/50 text-slate-300 hover:text-cyan-300 text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:scale-105"
               >
-                <span>#{item.text}</span>
-                <span className="text-[10px] text-slate-500 tabular-nums">({item.value})</span>
+                <span className="font-medium text-cyan-400/80">#</span>
+                <span>{item.text}</span>
+                <span className="text-[10px] text-slate-500 font-mono tabular-nums">({item.value})</span>
               </button>
             ))}
           </div>

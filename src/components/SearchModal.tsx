@@ -515,40 +515,40 @@ export const SearchModal: React.FC<Props> = ({ onSelectMemory, onError }) => {
   return (
     <div className="space-y-6">
       {/* Top Search Bar Card */}
-      <div className="bg-slate-900/90 border border-cyan-900/50 rounded-xl p-6 backdrop-blur-md shadow-2xl relative overflow-hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800 mb-4">
+      <div className="glass-panel rounded-2xl p-6 sm:p-7 border border-white/[0.08] shadow-2xl relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/[0.06] mb-5">
           <div>
-            <h2 className="text-lg font-bold font-mono text-white flex items-center gap-2">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2 tracking-tight">
               <Search className="w-5 h-5 text-cyan-400" />
-              <span>Lexical Inverted Index Smart Search</span>
+              <span>Smart Search &amp; Folder Retrieval</span>
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5 font-mono">
-              Retrieve scattered records & matching category folders by partial phrases, keywords, or topics.
+            <p className="text-xs text-slate-400 mt-0.5">
+              Retrieve scattered records and matching topic folders by phrases, keywords, attachments, or audio files.
             </p>
           </div>
           {elapsedMs !== null && (
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded bg-cyan-950/80 border border-cyan-800 text-cyan-300 font-mono text-xs self-start sm:self-auto">
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-cyan-950/80 border border-cyan-800/80 text-cyan-300 font-mono text-xs self-start sm:self-auto shadow-sm">
               <Clock className="w-3.5 h-3.5 text-cyan-400" />
               <span>Search: <strong>{elapsedMs.toFixed(2)} ms</strong></span>
             </div>
           )}
         </div>
 
-        {/* Input box */}
+        {/* Command Palette Input Box */}
         <div className="relative mb-3">
           <input
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Search keywords, events, or topics (e.g. 'hackathon', 'java', 'award winning')..."
-            className="w-full pl-11 pr-10 py-3.5 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 font-mono transition-colors shadow-inner"
+            placeholder="Search keywords, reflections, people, or folders (e.g. 'hackathon', 'java', 'award')..."
+            className="w-full pl-12 pr-12 py-3.5 bg-black/50 border border-white/[0.12] rounded-2xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all shadow-inner"
             autoFocus
           />
-          <Search className="w-5 h-5 text-cyan-400 absolute left-3.5 top-3.5 pointer-events-none" />
+          <Search className="w-5 h-5 text-cyan-400 absolute left-4 top-3.5 pointer-events-none" />
           {query && (
             <button
               onClick={() => setQuery('')}
-              className="absolute right-3.5 top-3.5 text-slate-400 hover:text-white"
+              className="absolute right-4 top-3.5 text-slate-400 hover:text-white transition-colors cursor-pointer"
               title="Clear search"
             >
               <X className="w-4 h-4" />

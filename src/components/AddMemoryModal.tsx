@@ -543,17 +543,17 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
   };
 
   return (
-    <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 sm:p-8 backdrop-blur-md relative">
-      <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-6">
+    <div className="glass-panel rounded-2xl p-6 sm:p-8 relative shadow-2xl border border-white/[0.08]">
+      <div className="flex items-center justify-between pb-5 border-b border-white/[0.06] mb-6">
         <div>
           <div className="flex items-center gap-2 text-xs font-mono text-cyan-400 mb-1">
             <span>Lexical Processing</span>
-            <span aria-hidden="true">·</span>
+            <span aria-hidden="true" className="text-slate-600">·</span>
             <span>AES-256 Encrypted</span>
-            <span aria-hidden="true">·</span>
-            <span>Photos & Voice Notes</span>
+            <span aria-hidden="true" className="text-slate-600">·</span>
+            <span>Photos &amp; Voice Notes</span>
           </div>
-          <h1 className="text-xl font-bold text-white tracking-tight">Record New Memory</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">Record New Memory</h1>
           <p className="text-xs text-slate-400 mt-0.5">
             Store events, milestones, photos, and voice notes securely in your personal vault.
           </p>
@@ -563,7 +563,7 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
           <button
             type="button"
             onClick={onCancel}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
             aria-label="Cancel"
           >
             <X className="w-5 h-5" />
@@ -582,7 +582,7 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
               type="button"
               onClick={handleAutoTitle}
               disabled={generatingTitle}
-              className="text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1 disabled:opacity-50"
+              className="text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer"
             >
               <Wand2 className="w-3 h-3" />
               <span>{generatingTitle ? 'Generating...' : 'Auto-Title from Description'}</span>
@@ -594,8 +594,7 @@ export const AddMemoryModal: React.FC<Props> = ({ onSuccess, onError, onCancel }
             onChange={(e) => setTitle(e.target.value)}
             placeholder="e.g. AI Hackathon presentation and award"
             maxLength={60}
-            required
-            className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-colors"
+            className="w-full px-3.5 py-2.5 bg-black/40 border border-white/[0.08] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/30 transition-all"
           />
         </div>
 

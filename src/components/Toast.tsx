@@ -9,8 +9,8 @@ interface Props {
 
 export const ToastContainer: React.FC<Props> = ({ toasts, onDismiss }) => {
   return (
-    <div className="fixed top-5 right-5 z-50 flex flex-col gap-2 max-w-md w-full pointer-events-none">
-      {toasts.map(toast => (
+    <div className="fixed top-5 right-5 z-50 flex flex-col gap-2.5 max-w-md w-full pointer-events-none px-4 sm:px-0">
+      {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} onDismiss={onDismiss} />
       ))}
     </div>
@@ -33,28 +33,44 @@ const ToastItem: React.FC<{ toast: ToastMessage; onDismiss: (id: string) => void
 
   return (
     <div
-      className={`pointer-events-auto flex items-start gap-3 p-4 rounded-lg shadow-xl border font-mono text-xs transition-all animate-in slide-in-from-top-2 duration-200 ${
+      className={`pointer-events-auto flex items-start gap-3 p-4 rounded-xl shadow-2xl border backdrop-blur-xl text-xs transition-all duration-300 animate-in slide-in-from-top-3 ${
         isError
-          ? 'bg-rose-950/90 border-rose-500/50 text-rose-200'
+          ? 'bg-[#180A0E]/95 border-rose-500/30 text-rose-100 shadow-rose-950/20'
           : isSuccess
-          ? 'bg-emerald-950/90 border-emerald-500/50 text-emerald-200'
-          : 'bg-slate-900/90 border-cyan-500/50 text-cyan-200'
+          ? 'bg-[#081512]/95 border-emerald-500/30 text-emerald-100 shadow-emerald-950/20'
+          : 'bg-[#0A1220]/95 border-cyan-500/30 text-cyan-100 shadow-cyan-950/20'
       }`}
     >
       <div className="mt-0.5 shrink-0">
-        {isError && <AlertCircle className="w-4 h-4 text-rose-400" />}
-        {isSuccess && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
-        {!isError && !isSuccess && <Info className="w-4 h-4 text-cyan-400" />}
+        {isError && (
+          <div className="p-1 rounded-md bg-rose-500/20 text-rose-400">
+            <AlertCircle className="w-4 h-4" />
+          </div>
+        )}
+        {isSuccess && (
+          <div className="p-1 rounded-md bg-emerald-500/20 text-emerald-400">
+            <CheckCircle2 className="w-4 h-4" />
+          </div>
+        )}
+        {!isError && !isSuccess && (
+          <div className="p-1 rounded-md bg-cyan-500/20 text-cyan-400">
+            <Info className="w-4 h-4" />
+          </div>
+        )}
       </div>
+
       <div className="flex-1 leading-relaxed">
-        <span className="font-bold mr-1">
-          {isError ? '[ERROR]' : isSuccess ? '[SUCCESS]' : '[INFO]'}
-        </span>
-        <span>{toast.text}</span>
+        <p className="font-semibold text-white tracking-tight">
+          {isError ? 'Notice' : isSuccess ? 'Success' : 'Information'}
+        </p>
+        <p className="text-slate-300 mt-0.5 text-xs">
+          {toast.text}
+        </p>
       </div>
+
       <button
         onClick={() => onDismiss(toast.id)}
-        className="text-slate-400 hover:text-white transition-colors shrink-0 ml-2"
+        className="text-slate-400 hover:text-white transition-colors shrink-0 ml-1 p-1 rounded-md hover:bg-white/10 cursor-pointer"
         aria-label="Dismiss toast"
       >
         <X className="w-3.5 h-3.5" />
